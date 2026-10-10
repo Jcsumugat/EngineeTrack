@@ -9,6 +9,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\StockLogController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -36,7 +37,9 @@ Route::middleware('auth')->group(function () {
         Route::resource('users', UserController::class)->except('show');
 
         Route::resource('inventory', InventoryController::class)->parameters(['inventory' => 'equipment']);
-        Route::post('/inventory/{equipment}/stock', [InventoryController::class, 'addStock'])->name('inventory.stock');
+        Route::post('/inventory/{equipment}/stock', [InventoryController::class, 'manageStock'])->name('inventory.stock');
+        Route::get('/stock-log', [StockLogController::class, 'index'])->name('stock-log.index');
+        Route::get('/stock-log/export', [StockLogController::class, 'export'])->name('stock-log.export');
 
         Route::resource('facilities', FacilityController::class)->except('show');
 
@@ -49,6 +52,7 @@ Route::middleware('auth')->group(function () {
         Route::patch('/borrowings/{borrowing}/disapprove', [BorrowingController::class, 'disapprove'])->name('borrowings.disapprove');
         Route::patch('/borrowings/{borrowing}/release', [BorrowingController::class, 'release'])->name('borrowings.release');
         Route::patch('/borrowings/{borrowing}/return', [BorrowingController::class, 'return'])->name('borrowings.return');
+        Route::patch('/borrowings/{borrowing}/replace', [BorrowingController::class, 'replace'])->name('borrowings.replace');
 
         Route::get('/reports/borrowed', [ReportController::class, 'borrowed'])->name('reports.borrowed');
         Route::get('/reports/borrowed/export', [ReportController::class, 'exportBorrowed'])->name('reports.borrowed.export');

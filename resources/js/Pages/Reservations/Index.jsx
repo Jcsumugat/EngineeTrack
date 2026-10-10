@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import Modal from '@/Components/Modal';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmModal from '@/Components/ConfirmModal';
-import Field, { inputClass, btnPrimary } from '@/Components/Field';
+import ActionMenu from '@/Components/ActionMenu';
+import Field, { inputClass, btnPrimary, btnSecondary } from '@/Components/Field';
 import { fmt } from '@/utils';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
@@ -50,12 +52,22 @@ const ACTIONS = {
     },
 };
 
+function Detail({ label, children, wide = false }) {
+    return (
+        <div className={wide ? 'sm:col-span-2' : ''}>
+            <dt className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</dt>
+            <dd className="mt-1 text-sm text-gray-900">{children || <span className="text-gray-400">-</span>}</dd>
+        </div>
+    );
+}
+
 export default function Index({ reservations }) {
     const { auth } = usePage().props;
     const isAdmin = auth.user.role === 'admin';
     const [confirm, setConfirm] = useState(null); // { action, item }
     const [remarks, setRemarks] = useState('');
     const [busy, setBusy] = useState(false);
+    const [details, setDetails] = useState(null);
 
     const open = (action, item) => {
         setRemarks('');
@@ -75,8 +87,17 @@ export default function Index({ reservations }) {
         });
     };
 
-    const link = 'text-blue-700 hover:underline';
+    const rowActions = (r) => [
+        { label: 'View details', onClick: () => setDetails(r) },
+        isAdmin && r.status === 'pending' && { label: 'Approve', onClick: () => open('approve', r) },
+        isAdmin && r.status === 'pending' && { label: 'Disapprove', onClick: () => open('disapprove', r), tone: 'danger' },
+        isAdmin && r.status === 'approved' && { label: 'Release', onClick: () => open('release', r) },
+        isAdmin && r.status === 'released' && r.facility_id && { label: 'Complete', onClick: () => open('complete', r) },
+        ['pending', 'approved'].includes(r.status) && { label: 'Cancel', onClick: () => open('cancel', r), tone: 'danger' },
+    ];
+
     const cfg = confirm ? ACTIONS[confirm.action] : null;
+    const d = details;
 
     return (
         <AuthenticatedLayout
@@ -127,22 +148,8 @@ export default function Index({ reservations }) {
                                     {r.remarks && <div className="text-xs text-red-600">Remarks: {r.remarks}</div>}
                                 </td>
                                 <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                                <td className="space-x-3 whitespace-nowrap px-4 py-3 text-right">
-                                    {isAdmin && r.status === 'pending' && (
-                                        <>
-                                            <button onClick={() => open('approve', r)} className={link}>Approve</button>
-                                            <button onClick={() => open('disapprove', r)} className="text-red-600 hover:underline">Disapprove</button>
-                                        </>
-                                    )}
-                                    {isAdmin && r.status === 'approved' && (
-                                        <button onClick={() => open('release', r)} className={link}>Release</button>
-                                    )}
-                                    {isAdmin && r.status === 'released' && r.facility_id && (
-                                        <button onClick={() => open('complete', r)} className={link}>Complete</button>
-                                    )}
-                                    {['pending', 'approved'].includes(r.status) && (
-                                        <button onClick={() => open('cancel', r)} className="text-gray-600 hover:underline">Cancel</button>
-                                    )}
+                                <td className="whitespace-nowrap px-4 py-3 text-right">
+                                    <ActionMenu items={rowActions(r)} />
                                 </td>
                             </tr>
                         ))}
@@ -153,6 +160,50 @@ export default function Index({ reservations }) {
                 </table>
             </div>
             <Pagination links={reservations.links} />
+
+            {/* View details */}
+            <Modal show={!!d} onClose={() => setDetails(null)} maxWidth="lg">
+                {d && (
+                    <div>
+                        <div className="flex items-start justify-between bg-gradient-to-r from-blue-900 to-blue-600 px-6 py-4 text-white">
+                            <div>
+                                <div className="text-xs font-semibold uppercase tracking-widest text-blue-200">
+                                    Reservation #{d.id}
+                                </div>
+                                <h3 className="mt-1 text-lg font-bold">{itemName(d)}</h3>
+                            </div>
+                            <StatusBadge status={d.status} />
+                        </div>
+
+                        <dl className="grid gap-4 p-6 sm:grid-cols-2">
+                            <Detail label="Requested by">
+                                {d.user?.name}
+                                {d.user?.email && <div className="text-xs text-gray-500">{d.user.email}</div>}
+                            </Detail>
+                            <Detail label="Department">{d.department?.name ?? d.user?.department?.name}</Detail>
+                            <Detail label="Type">{d.equipment_id ? 'Equipment' : 'Facility'}</Detail>
+                            <Detail label="Quantity">{d.quantity}</Detail>
+                            <Detail label="From">{fmt(d.date_from)}</Detail>
+                            <Detail label="To">{fmt(d.date_to)}</Detail>
+                            <Detail label="Purpose" wide>{d.purpose}</Detail>
+                            <Detail label="Submitted on">{fmt(d.created_at)}</Detail>
+                            <Detail label="Reviewed by">
+                                {d.reviewer?.name}
+                                {d.reviewed_at && <div className="text-xs text-gray-500">{fmt(d.reviewed_at)}</div>}
+                            </Detail>
+                            {d.remarks && (
+                                <Detail label="Remarks" wide>
+                                    <span className="text-red-600">{d.remarks}</span>
+                                </Detail>
+                            )}
+                        </dl>
+
+                        <div className="flex justify-end border-t border-gray-100 px-6 py-3">
+                            <button type="button" onClick={() => setDetails(null)} className={btnSecondary}>Close</button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
 
             <ConfirmModal
                 show={!!confirm}

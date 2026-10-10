@@ -2,10 +2,13 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Field, { inputClass, btnPrimary, btnSecondary } from '@/Components/Field';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 
-export default function Create({ equipment, facilities, departments }) {
+export default function Create({ equipment, facilities, departments, users = [] }) {
     const { auth } = usePage().props;
+    const isAdmin = auth.user.role === 'admin';
+
     const { data, setData, post, processing, errors } = useForm({
-        department_id: auth.user.department_id ?? '',
+        user_id: '',
+        department_id: isAdmin ? '' : (auth.user.department_id ?? ''),
         type: 'equipment',
         equipment_id: '',
         facility_id: '',
@@ -14,6 +17,12 @@ export default function Create({ equipment, facilities, departments }) {
         date_to: '',
         purpose: '',
     });
+
+    // Admin picks the staff member; their department is filled in automatically.
+    const pickUser = (id) => {
+        const u = users.find((x) => String(x.id) === String(id));
+        setData((prev) => ({ ...prev, user_id: id, department_id: u?.department_id ?? '' }));
+    };
 
     const submit = (e) => {
         e.preventDefault();
@@ -24,6 +33,15 @@ export default function Create({ equipment, facilities, departments }) {
         <AuthenticatedLayout header={<h2 className="text-xl font-bold text-gray-800">New Reservation</h2>}>
             <Head title="New Reservation" />
             <form onSubmit={submit} className="max-w-xl space-y-4 bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                {isAdmin && (
+                    <Field label="Reserved for (Staff/Faculty)" error={errors.user_id}>
+                        <select className={inputClass} value={data.user_id} onChange={(e) => pickUser(e.target.value)}>
+                            <option value="">Select staff or faculty</option>
+                            {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        </select>
+                    </Field>
+                )}
+
                 <Field label="Department" error={errors.department_id}>
                     <select className={inputClass} value={data.department_id} onChange={(e) => setData('department_id', e.target.value)}>
                         <option value="">Select department</option>

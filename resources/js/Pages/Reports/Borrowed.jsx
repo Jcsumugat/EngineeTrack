@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import StatusBadge from '@/Components/StatusBadge';
 import { inputClass, btnPrimary, btnSecondary } from '@/Components/Field';
@@ -32,11 +32,26 @@ export default function Borrowed({ report, filters }) {
     const [preview, setPreview] = useState(false);
     const [page, setPage] = useState(1);
 
-    const apply = (e) => {
-        e.preventDefault();
-        setPage(1);
-        router.get(route('reports.borrowed'), f, { preserveState: true });
-    };
+    // Apply filters automatically when month, year, or focus changes
+    useEffect(() => {
+        const same =
+            String(f.month) === String(filters.month) &&
+            String(f.year) === String(filters.year) &&
+            f.focus === filters.focus;
+        if (same) return;
+        if (!/^\d{4}$/.test(String(f.year))) return; // wait until the year is a full 4 digits
+
+        const t = setTimeout(() => {
+            setPage(1);
+            router.get(route('reports.borrowed'), f, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, 400);
+
+        return () => clearTimeout(t);
+    }, [f]);
 
     const exportUrl = route('reports.borrowed.export') + '?' + new URLSearchParams(f).toString();
     const preparedOn = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -73,7 +88,7 @@ export default function Borrowed({ report, filters }) {
 
             <div className="print:hidden">
                 {/* Filter */}
-                <form onSubmit={apply} className="mb-4 bg-white p-5 shadow-sm ring-1 ring-gray-200">
+                <form onSubmit={(e) => e.preventDefault()} className="mb-4 bg-white p-5 shadow-sm ring-1 ring-gray-200">
                     <h3 className="text-base font-bold text-gray-800">Generate Monthly Report</h3>
                     <p className="mb-4 mt-1 text-xs text-gray-500">
                         Monthly report on borrowed resources and equipment requested from the Engineer&rsquo;s Office.
@@ -96,7 +111,6 @@ export default function Borrowed({ report, filters }) {
                             </select>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <button className={btnPrimary}>Apply Filter</button>
                             <button type="button" onClick={() => window.print()} className={btnSecondary}>Print Report</button>
                         </div>
                     </div>

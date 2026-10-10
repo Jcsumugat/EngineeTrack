@@ -7,9 +7,11 @@ use App\Models\Department;
 use App\Models\Equipment;
 use App\Models\Facility;
 use App\Models\Reservation;
+use App\Models\User;
 use App\Services\AvailabilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -32,12 +34,17 @@ class ReservationController extends Controller
             'equipment' => Equipment::withBorrowedQty()->where('is_active', 1)->orderBy('name')->get(),
             'facilities' => Facility::where('is_active', 1)->orderBy('name')->get(),
             'departments' => Department::orderBy('name')->get(['id', 'name']),
+            'users' => auth()->user()->isAdmin()
+                ? User::where('role', 'faculty_staff')->orderBy('name')->get(['id', 'name', 'department_id'])
+                : [],
         ]);
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate([
+        $user = auth()->user();
+
+        $rules = [
             'department_id' => 'required|exists:departments,id',
             'type' => 'required|in:equipment,facility',
             'equipment_id' => 'required_if:type,equipment|nullable|exists:equipment,id',
@@ -46,7 +53,14 @@ class ReservationController extends Controller
             'date_from' => 'required|date|after_or_equal:now',
             'date_to' => 'required|date|after_or_equal:date_from',
             'purpose' => 'nullable|string|max:500',
-        ]);
+        ];
+        // Only admins may choose who the reservation is for.
+        if ($user->isAdmin()) {
+            $rules['user_id'] = ['required', Rule::exists('users', 'id')->where('role', 'faculty_staff')];
+        }
+
+        $data = $request->validate($rules);
+        $ownerId = $user->isAdmin() ? $data['user_id'] : $user->id;
 
         if ($data['type'] === 'equipment') {
             $eq = Equipment::findOrFail($data['equipment_id']);
@@ -64,7 +78,7 @@ class ReservationController extends Controller
         }
 
         Reservation::create($payload + [
-            'user_id' => auth()->id(),
+            'user_id' => $ownerId,
             'department_id' => $data['department_id'],
             'date_from' => $data['date_from'],
             'date_to' => $data['date_to'],

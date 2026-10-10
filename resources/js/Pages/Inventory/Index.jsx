@@ -3,15 +3,20 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Modal from '@/Components/Modal';
 import Pagination from '@/Components/Pagination';
 import ConfirmModal from '@/Components/ConfirmModal';
+import ActionMenu from '@/Components/ActionMenu';
 import Field, { inputClass, btnPrimary, btnSecondary } from '@/Components/Field';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+
+// Units that are not currently out on loan
+const availableOf = (item) =>
+    Number(item.available_quantity ?? Number(item.total_quantity) - Number(item.out_quantity || 0));
 
 export default function Index({ items, filters }) {
     const [q, setQ] = useState(filters?.q || '');
     const [target, setTarget] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
-    const form = useForm({ quantity: 1, reason: '' });
+    const form = useForm({ action: 'add', quantity: 1, reason: '' });
 
     const search = (e) => {
         e.preventDefault();
@@ -26,7 +31,12 @@ export default function Index({ items, filters }) {
 
     const submitStock = (e) => {
         e.preventDefault();
-        form.post(route('inventory.stock', target.id), { onSuccess: closeModal });
+        form.post(route('inventory.stock', target.id), { preserveScroll: true, onSuccess: closeModal });
+    };
+
+    const setAction = (action) => {
+        form.clearErrors();
+        form.setData('action', action);
     };
 
     const confirmDelete = () => {
@@ -40,12 +50,35 @@ export default function Index({ items, filters }) {
         });
     };
 
+    const rowActions = (item) => [
+        { label: 'View details', onClick: () => router.visit(route('inventory.show', item.id)) },
+        { label: 'Manage stock', onClick: () => setTarget(item) },
+        { label: 'Edit', onClick: () => router.visit(route('inventory.edit', item.id)) },
+        { label: 'Delete', onClick: () => setDeleteTarget(item), tone: 'danger' },
+    ];
+
+    const isReduce = form.data.action === 'reduce';
+    const available = target ? availableOf(target) : 0;
+    const qty = Number(form.data.quantity) || 0;
+    const newTotal = target ? Number(target.total_quantity) + (isReduce ? -qty : qty) : 0;
+
+    const tabClass = (active, tone) =>
+        'flex-1 px-4 py-2 text-sm font-semibold transition ' +
+        (active
+            ? tone === 'danger'
+                ? 'bg-red-600 text-white'
+                : 'bg-blue-700 text-white'
+            : 'bg-white text-gray-600 hover:bg-gray-50');
+
     return (
         <AuthenticatedLayout
             header={
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-gray-800">Inventory</h2>
-                    <Link href={route('inventory.create')} className={btnPrimary}>Add Equipment</Link>
+                    <div className="flex gap-2">
+                        <Link href={route('stock-log.index')} className={btnSecondary}>Stock Log</Link>
+                        <Link href={route('inventory.create')} className={btnPrimary}>Add Equipment</Link>
+                    </div>
                 </div>
             }
         >
@@ -72,7 +105,7 @@ export default function Index({ items, filters }) {
                     <tbody className="divide-y divide-gray-100">
                         {items.data.map((item) => {
                             const borrowed = Number(item.out_quantity || 0);
-                            const available = item.available_quantity ?? item.total_quantity - borrowed;
+                            const avail = availableOf(item);
                             return (
                                 <tr key={item.id}>
                                     <td className="px-4 py-3 font-medium text-gray-900">
@@ -81,18 +114,16 @@ export default function Index({ items, filters }) {
                                     <td className="px-4 py-3 text-gray-600">{item.description}</td>
                                     <td className="px-4 py-3">{item.total_quantity}</td>
                                     <td className="px-4 py-3">{borrowed}</td>
-                                    <td className={'px-4 py-3 font-semibold ' + (available <= 0 ? 'text-red-600' : 'text-green-700')}>
-                                        {available}
+                                    <td className={'px-4 py-3 font-semibold ' + (avail <= 0 ? 'text-red-600' : 'text-green-700')}>
+                                        {avail}
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={'rounded-full px-2.5 py-0.5 text-xs font-semibold ' + (item.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700')}>
                                             {item.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
-                                    <td className="space-x-3 px-4 py-3 text-right">
-                                        <button onClick={() => setTarget(item)} className="text-blue-700 hover:underline">Add stock</button>
-                                        <Link href={route('inventory.edit', item.id)} className="text-blue-700 hover:underline">Edit</Link>
-                                        <button onClick={() => setDeleteTarget(item)} className="text-red-600 hover:underline">Delete</button>
+                                    <td className="whitespace-nowrap px-4 py-3 text-right">
+                                        <ActionMenu items={rowActions(item)} />
                                     </td>
                                 </tr>
                             );
@@ -116,20 +147,78 @@ export default function Index({ items, filters }) {
                 onClose={() => setDeleteTarget(null)}
             />
 
+            {/* Manage stock modal */}
             <Modal show={!!target} onClose={closeModal} maxWidth="md">
-                <form onSubmit={submitStock} className="space-y-4 p-6">
-                    <h3 className="text-lg font-semibold text-gray-800">Add stock: {target?.name}</h3>
-                    <Field label="Quantity to add" error={form.errors.quantity}>
-                        <input type="number" min="1" className={inputClass} value={form.data.quantity} onChange={(e) => form.setData('quantity', e.target.value)} />
-                    </Field>
-                    <Field label="Reason (optional)" error={form.errors.reason}>
-                        <input className={inputClass} value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} />
-                    </Field>
-                    <div className="flex justify-end gap-2">
-                        <button type="button" onClick={closeModal} className={btnSecondary}>Cancel</button>
-                        <button disabled={form.processing} className={btnPrimary}>Add stock</button>
-                    </div>
-                </form>
+                {target && (
+                    <form onSubmit={submitStock} className="space-y-4 p-6">
+                        <h3 className="text-lg font-semibold text-gray-800">Manage stock: {target.name}</h3>
+
+                        <div className="grid grid-cols-3 gap-2 bg-gray-50 p-3 text-center text-xs ring-1 ring-gray-200">
+                            <div>
+                                <div className="text-lg font-bold text-gray-800">{target.total_quantity}</div>
+                                Total
+                            </div>
+                            <div>
+                                <div className="text-lg font-bold text-amber-600">{Number(target.out_quantity || 0)}</div>
+                                Borrowed
+                            </div>
+                            <div>
+                                <div className="text-lg font-bold text-green-700">{available}</div>
+                                Available
+                            </div>
+                        </div>
+
+                        <div className="flex overflow-hidden ring-1 ring-gray-300">
+                            <button type="button" onClick={() => setAction('add')} className={tabClass(!isReduce, 'primary')}>
+                                Add stock
+                            </button>
+                            <button type="button" onClick={() => setAction('reduce')} className={tabClass(isReduce, 'danger')}>
+                                Reduce stock
+                            </button>
+                        </div>
+
+                        <Field
+                            label={isReduce ? `Quantity to reduce (max ${available})` : 'Quantity to add'}
+                            error={form.errors.quantity}
+                        >
+                            <input
+                                type="number"
+                                min="1"
+                                max={isReduce ? Math.max(available, 1) : undefined}
+                                className={inputClass}
+                                value={form.data.quantity}
+                                onChange={(e) => form.setData('quantity', e.target.value)}
+                            />
+                        </Field>
+
+                        <Field
+                            label={isReduce ? 'Reason (required)' : 'Reason (optional)'}
+                            error={form.errors.reason}
+                        >
+                            <input
+                                className={inputClass}
+                                placeholder={isReduce ? 'e.g. Lost, disposed, transferred' : 'e.g. New purchase, donation'}
+                                value={form.data.reason}
+                                onChange={(e) => form.setData('reason', e.target.value)}
+                            />
+                        </Field>
+
+                        <p className={'text-xs ' + (isReduce ? 'text-red-600' : 'text-green-700')}>
+                            New total after this change: <span className="font-semibold">{newTotal}</span>.
+                            This movement will be recorded in the stock log.
+                        </p>
+
+                        <div className="flex justify-end gap-2">
+                            <button type="button" onClick={closeModal} className={btnSecondary}>Cancel</button>
+                            <button
+                                disabled={form.processing || (isReduce && (available <= 0 || qty > available))}
+                                className={btnPrimary}
+                            >
+                                {isReduce ? 'Confirm reduction' : 'Confirm addition'}
+                            </button>
+                        </div>
+                    </form>
+                )}
             </Modal>
         </AuthenticatedLayout>
     );

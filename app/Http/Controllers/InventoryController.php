@@ -7,6 +7,7 @@ use App\Models\EquipmentStockLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -76,24 +77,51 @@ class InventoryController extends Controller
         return redirect()->route('inventory.index')->with('success', 'Equipment updated.');
     }
 
-    public function addStock(Request $request, Equipment $equipment)
+    public function manageStock(Request $request, Equipment $equipment)
     {
         $data = $request->validate([
+            'action' => ['required', Rule::in(['add', 'reduce'])],
             'quantity' => 'required|integer|min:1|max:100000',
-            'reason' => 'nullable|string|max:255',
+            // A reason is mandatory when reducing, so every deduction can be audited
+            'reason' => [Rule::requiredIf($request->input('action') === 'reduce'), 'nullable', 'string', 'max:255'],
+        ], [
+            'reason.required' => 'Please give a reason for reducing stock.',
         ]);
 
-        DB::transaction(function () use ($equipment, $data) {
-            $equipment->increment('total_quantity', $data['quantity']);
+        $isAdd = $data['action'] === 'add';
+        $quantity = (int) $data['quantity'];
+
+        DB::transaction(function () use ($equipment, $data, $isAdd, $quantity) {
+            // Lock the row so two admins cannot reduce the same stock at once
+            $locked = Equipment::withBorrowedQty()
+                ->whereKey($equipment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (!$isAdd) {
+                $available = (int) ($locked->available_quantity
+                    ?? ((int) $locked->total_quantity - (int) $locked->out_quantity));
+
+                if ($quantity > $available) {
+                    throw ValidationException::withMessages([
+                        'quantity' => "You can only reduce up to {$available} available unit(s). The rest are currently borrowed or reserved.",
+                    ]);
+                }
+            }
+
+            $change = $isAdd ? $quantity : -$quantity;
+
+            Equipment::whereKey($equipment->id)->increment('total_quantity', $change);
+
             EquipmentStockLog::create([
                 'equipment_id' => $equipment->id,
-                'change' => $data['quantity'],
-                'reason' => $data['reason'] ?? 'Additional stock',
+                'change' => $change,
+                'reason' => $data['reason'] ?: ($isAdd ? 'Additional stock' : 'Stock reduction'),
                 'created_by' => auth()->id(),
             ]);
         });
 
-        return back()->with('success', 'Stock added.');
+        return back()->with('success', $isAdd ? 'Stock added.' : 'Stock reduced.');
     }
 
     public function destroy(Equipment $equipment)

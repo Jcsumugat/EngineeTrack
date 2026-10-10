@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 09, 2026 at 05:25 AM
+-- Generation Time: Oct 09, 2026 at 05:16 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -47,6 +47,9 @@ CREATE TABLE `borrowings` (
   `is_damaged` tinyint(1) NOT NULL DEFAULT 0,
   `damaged_quantity` int(10) UNSIGNED NOT NULL DEFAULT 0,
   `damage_note` varchar(500) DEFAULT NULL,
+  `replaced_quantity` int(10) UNSIGNED NOT NULL DEFAULT 0,
+  `replaced_at` datetime DEFAULT NULL,
+  `replacement_note` varchar(500) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -55,8 +58,9 @@ CREATE TABLE `borrowings` (
 -- Dumping data for table `borrowings`
 --
 
-INSERT INTO `borrowings` (`id`, `user_id`, `department_id`, `reservation_id`, `equipment_id`, `quantity`, `purpose`, `borrowed_at`, `due_at`, `status`, `reviewed_by`, `reviewed_at`, `released_by`, `released_at`, `returned_at`, `received_by`, `is_damaged`, `damaged_quantity`, `damage_note`, `created_at`, `updated_at`) VALUES
-(2, 2, 1, NULL, 4, 10, NULL, '2026-10-08 03:50:34', '2026-10-09 12:00:00', 'returned', 1, '2026-10-07 19:48:07', 1, '2026-10-08 03:50:34', '2026-10-09 02:31:33', 1, 1, 1, 'Poor quality', '2026-10-07 19:47:33', '2026-10-08 18:31:33');
+INSERT INTO `borrowings` (`id`, `user_id`, `department_id`, `reservation_id`, `equipment_id`, `quantity`, `purpose`, `borrowed_at`, `due_at`, `status`, `reviewed_by`, `reviewed_at`, `released_by`, `released_at`, `returned_at`, `received_by`, `is_damaged`, `damaged_quantity`, `damage_note`, `replaced_quantity`, `replaced_at`, `replacement_note`, `created_at`, `updated_at`) VALUES
+(2, 2, 1, NULL, 4, 10, NULL, '2026-10-08 03:50:34', '2026-10-09 12:00:00', 'returned', 1, '2026-10-07 19:48:07', 1, '2026-10-08 03:50:34', '2026-10-09 02:31:33', 1, 1, 1, 'Poor quality', 1, '2026-10-09 13:33:30', NULL, '2026-10-07 19:47:33', '2026-10-09 05:33:30'),
+(3, 2, 1, NULL, 2, 2, 'For the upcoming event.', '2026-10-09 13:57:48', '2026-10-13 12:00:00', 'returned', 1, '2026-10-09 05:57:30', 1, '2026-10-09 13:57:48', '2026-10-09 14:29:04', 1, 0, 0, NULL, 0, NULL, NULL, '2026-10-09 05:56:47', '2026-10-09 06:29:04');
 
 -- --------------------------------------------------------
 
@@ -106,7 +110,7 @@ INSERT INTO `equipment` (`id`, `name`, `description`, `total_quantity`, `is_acti
 (1, 'Projector', 'LCD projector', 5, 1, '2026-10-06 15:46:17', '2026-10-06 15:46:17'),
 (2, 'Extension Cord', '5-meter extension cord', 10, 1, '2026-10-06 15:46:17', '2026-10-06 15:46:17'),
 (3, 'Microphone', 'Wireless microphone', 4, 1, '2026-10-06 15:46:17', '2026-10-06 15:46:17'),
-(4, 'Mono Blocks Chair', 'RFC', 299, 1, '2026-10-06 20:33:21', '2026-10-08 18:31:33');
+(4, 'Mono Blocks Chair', 'RFC', 300, 1, '2026-10-06 20:33:21', '2026-10-09 05:33:30');
 
 -- --------------------------------------------------------
 
@@ -130,7 +134,8 @@ CREATE TABLE `equipment_stock_logs` (
 
 INSERT INTO `equipment_stock_logs` (`id`, `equipment_id`, `change`, `reason`, `created_by`, `created_at`, `updated_at`) VALUES
 (1, 4, 300, 'Initial stock', 1, '2026-10-06 20:33:21', '2026-10-06 20:33:21'),
-(2, 4, -1, 'Damaged on return (borrowing #2)', 1, '2026-10-08 18:31:33', '2026-10-08 18:31:33');
+(2, 4, -1, 'Damaged on return (borrowing #2)', 1, '2026-10-08 18:31:33', '2026-10-08 18:31:33'),
+(3, 4, 1, 'Replacement for damaged items (borrowing #2)', 1, '2026-10-09 05:33:31', '2026-10-09 05:33:31');
 
 -- --------------------------------------------------------
 
@@ -197,7 +202,8 @@ CREATE TABLE `reservations` (
 --
 
 INSERT INTO `reservations` (`id`, `user_id`, `department_id`, `equipment_id`, `facility_id`, `quantity`, `date_from`, `date_to`, `purpose`, `status`, `reviewed_by`, `reviewed_at`, `remarks`, `created_at`, `updated_at`) VALUES
-(2, 2, 1, NULL, 2, 1, '2026-10-09 12:00:00', '2026-10-09 14:00:00', 'Laboratory for BSIS 4B', 'released', 1, '2026-10-08 19:06:20', NULL, '2026-10-08 19:06:00', '2026-10-08 19:06:28');
+(2, 2, 1, NULL, 2, 1, '2026-10-09 12:00:00', '2026-10-09 14:00:00', 'Laboratory for BSIS 4B', 'completed', 1, '2026-10-08 19:06:20', NULL, '2026-10-08 19:06:00', '2026-10-09 05:47:30'),
+(3, 2, 1, NULL, 2, 1, '2026-10-10 12:00:00', '2026-10-11 12:00:00', 'BSIS 4C Class', 'released', 1, '2026-10-09 06:28:05', NULL, '2026-10-09 06:19:29', '2026-10-09 06:28:13');
 
 -- --------------------------------------------------------
 
@@ -223,8 +229,8 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `role`, `department_id`, `remember_token`, `created_at`, `updated_at`) VALUES
-(1, 'System Administrator', 'admin@gmail.com', NULL, '$2y$12$4jJkk.e5AKZZ6G.VwaytnOeJr/KiBd7IAOmyiAzPGUrcItv9OyXda', 'admin', NULL, '17F0PJ1DmrLiaVs9XJBQnjWekenyo9BSdOq8WXB554iGX4g2xFo286DyZQ2N', '2026-10-06 15:46:17', '2026-10-06 15:46:17'),
-(2, 'Kier Christine Gonzales', 'staff@gmail.com', NULL, '$2y$12$60TvcpxXRMR.VTi3O567..gRi/c9qrFfS9tBZ03EdafZSn7097dxS', 'faculty_staff', 1, NULL, '2026-10-07 06:01:10', '2026-10-07 06:01:10');
+(1, 'System Administrator', 'admin@gmail.com', NULL, '$2y$12$4jJkk.e5AKZZ6G.VwaytnOeJr/KiBd7IAOmyiAzPGUrcItv9OyXda', 'admin', NULL, 'XnRfQjz11jyFuAEQRAWQ0t1LCnRakWE3Z2flRiO52XwjkcTkZFstgduoPDZO', '2026-10-06 15:46:17', '2026-10-06 15:46:17'),
+(2, 'Irene Grace Sy', 'staff@gmail.com', NULL, '$2y$12$FeSXGHggqwJL0995uTN4MuoUz8Sk5o8H6Kh8YQxYofUsd5W1DwKXO', 'faculty_staff', 1, NULL, '2026-10-07 06:01:10', '2026-10-09 05:23:10');
 
 --
 -- Indexes for dumped tables
@@ -309,7 +315,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `borrowings`
 --
 ALTER TABLE `borrowings`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `departments`
@@ -327,7 +333,7 @@ ALTER TABLE `equipment`
 -- AUTO_INCREMENT for table `equipment_stock_logs`
 --
 ALTER TABLE `equipment_stock_logs`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `facilities`
